@@ -28,13 +28,13 @@ func main() {
 func handleClient(conn net.Conn) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
-	n, err := conn.Read(buff)
-	if err != nil {
-		fmt.Println("Failed to read message:", err);
-		os.Exit(1)
+	for {
+		_, err := conn.Read(buff)
+		if err != nil {
+			break
+		}
+		msg := []byte("+PONG\r\n")
+		conn.Write(msg)
 	}
-	fmt.Println(string(buff[:n]));
-	msg := []byte("+PONG\r\n")
-	conn.Write(msg)
-
 }
+
