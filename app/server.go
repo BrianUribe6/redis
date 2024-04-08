@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/app/parser"
 )
 
 func main() {
@@ -20,10 +22,9 @@ func main() {
 			fmt.Println("Error accepting connection: ", err)
 			continue
 		}
-		go handleClient(conn);
+		go handleClient(conn)
 	}
 }
-
 
 func handleClient(conn net.Conn) {
 	defer conn.Close()
@@ -33,8 +34,11 @@ func handleClient(conn net.Conn) {
 		if err != nil {
 			break
 		}
-		msg := []byte("+PONG\r\n")
-		conn.Write(msg)
+		commandParser := parser.New(buff)
+		cmd, err := commandParser.Parse()
+		if err != nil {
+			break
+		}
+		(*cmd).Execute(conn)
 	}
 }
-
