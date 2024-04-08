@@ -20,3 +20,8 @@ func ReplySimpleError(conn net.Conn, errMsg string) {
 	s := fmt.Sprintf("-%s\r\n", errMsg)
 	conn.Write([]byte(s))
 }
+
+func ReplyNullBulkString(conn net.Conn) {
+	s := fmt.Sprintf("$-1\r\n")
+	conn.Write([]byte(s))
+}
