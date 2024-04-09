@@ -1,12 +1,31 @@
 package store
 
-var db map[string]string = make(map[string]string)
+import "time"
 
-func Set(key string, value string) {
-	db[key] = value
+var db map[string]*Item = make(map[string]*Item)
+
+type Item struct {
+	value     string
+	expiresAt time.Time
+}
+
+func Set(key string, value string, expiry int64) {
+	item := new(Item)
+	item.value = value
+	if expiry > 0 {
+		duration := time.Duration(expiry) * time.Millisecond
+		item.expiresAt = time.Now().Add(duration)
+	}
+	db[key] = item
 }
 
 func Get(key string) (string, bool) {
-	value, exist := db[key]
-	return value, exist
+	item, exist := db[key]
+	if exist {
+		if item.expiresAt.Compare(time.Now()) < 0 {
+			delete(db, key)
+			return "", false
+		}
+	}
+	return item.value, exist
 }

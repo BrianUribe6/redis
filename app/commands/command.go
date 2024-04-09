@@ -2,6 +2,9 @@ package command
 
 import (
 	"net"
+	"strings"
+
+	"strconv"
 
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -22,7 +25,7 @@ type GetCommand Command
 type NotImplementedCommand Command
 
 func New(label string, params []string) Executor {
-	switch label {
+	switch strings.ToLower(label) {
 	case "ping":
 		return &PingCommand{label, params}
 	case "echo":
@@ -54,15 +57,32 @@ func (cmd *EchoCommand) Execute(con net.Conn) {
 }
 
 func (cmd *NotImplementedCommand) Execute(con net.Conn) {
-	ReplySimpleError(con, "Unknown command, may not be implemented yet")
+	ReplySimpleError(con, "unknown command, may not be implemented yet")
 }
 
 func (cmd *SetCommand) Execute(con net.Conn) {
-	if len(cmd.args) != 2 {
+	numArgs := len(cmd.args)
+	if numArgs < 2 || numArgs > 4 {
 		ReplySimpleError(con, "wrong number of arguments for 'set' command.")
 		return
 	}
-	store.Set(cmd.args[0], cmd.args[1])
+	key := cmd.args[0]
+	value := cmd.args[1]
+	var expiry int64 = -1
+
+	if numArgs > 3 && strings.ToLower(cmd.args[2]) == "px" {
+		ms, err := strconv.ParseInt(cmd.args[3], 10, 64)
+		if err != nil || ms < 0 {
+			ReplySimpleError(con, "invalid expiry time")
+			return
+		}
+		expiry = ms
+	} else {
+		ReplySimpleError(con, "syntax error")
+		return
+	}
+
+	store.Set(key, value, expiry)
 	ReplyBulkString(con, "OK")
 }
 
