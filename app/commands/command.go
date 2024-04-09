@@ -62,7 +62,8 @@ func (cmd *NotImplementedCommand) Execute(con net.Conn) {
 
 func (cmd *SetCommand) Execute(con net.Conn) {
 	numArgs := len(cmd.args)
-	if numArgs < 2 || numArgs > 4 {
+	// TODO write a proper flag parser
+	if numArgs != 2 && numArgs != 4 {
 		ReplySimpleError(con, "wrong number of arguments for 'set' command.")
 		return
 	}
@@ -70,16 +71,19 @@ func (cmd *SetCommand) Execute(con net.Conn) {
 	value := cmd.args[1]
 	var expiry int64 = -1
 
-	if numArgs > 3 && strings.ToLower(cmd.args[2]) == "px" {
-		ms, err := strconv.ParseInt(cmd.args[3], 10, 64)
-		if err != nil || ms < 0 {
+	if numArgs == 4 {
+		pxFlag := strings.ToLower(cmd.args[2])
+		if pxFlag != "px" {
+			ReplySimpleError(con, "syntax error")
+			return
+		}
+
+		exp, err := strconv.ParseInt(cmd.args[3], 10, 64)
+		if err != nil || exp < 0 {
 			ReplySimpleError(con, "invalid expiry time")
 			return
 		}
-		expiry = ms
-	} else {
-		ReplySimpleError(con, "syntax error")
-		return
+		expiry = exp
 	}
 
 	store.Set(key, value, expiry)
