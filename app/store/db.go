@@ -6,7 +6,7 @@ var db map[string]*Item = make(map[string]*Item)
 
 type Item struct {
 	value     string
-	expiresAt time.Time
+	expiresAt *time.Time
 }
 
 func Set(key string, value string, expiry int64) {
@@ -14,18 +14,18 @@ func Set(key string, value string, expiry int64) {
 	item.value = value
 	if expiry > 0 {
 		duration := time.Duration(expiry) * time.Millisecond
-		item.expiresAt = time.Now().Add(duration)
+		expiresAt := time.Now().Add(duration)
+		item.expiresAt = &expiresAt
 	}
 	db[key] = item
 }
 
 func Get(key string) (string, bool) {
 	item, exist := db[key]
-	if exist {
-		if item.expiresAt.Compare(time.Now()) < 0 {
-			delete(db, key)
-			return "", false
-		}
+	if exist && item.expiresAt != nil && item.expiresAt.Compare(time.Now()) < 0 {
+		delete(db, key)
+		return "", false
+
 	}
 	return item.value, exist
 }
