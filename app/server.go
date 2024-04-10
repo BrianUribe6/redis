@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/parser"
 )
@@ -13,13 +12,10 @@ func main() {
 	portNumFlag := flag.Int("port", 6379, "the port at which the server will be listening to")
 	flag.Parse()
 
-	address := fmt.Sprintf("0.0.0.0:%d", *portNumFlag)
-
-	fmt.Printf("Server running at %s\n", address)
+	address := fmt.Sprint("0.0.0.0:", *portNumFlag)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		fmt.Println("Failed to bind to port 6379")
-		os.Exit(1)
+		panic(err)
 	}
 	defer listener.Close()
 

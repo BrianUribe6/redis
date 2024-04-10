@@ -22,6 +22,7 @@ type PingCommand Command
 type EchoCommand Command
 type SetCommand Command
 type GetCommand Command
+type InfoCommand Command
 type NotImplementedCommand Command
 
 func New(label string, params []string) Executor {
@@ -34,6 +35,8 @@ func New(label string, params []string) Executor {
 		return &SetCommand{label, params}
 	case "get":
 		return &GetCommand{label, params}
+	case "info":
+		return &InfoCommand{label, params}
 	}
 	return &NotImplementedCommand{}
 }
@@ -101,4 +104,22 @@ func (cmd *GetCommand) Execute(con net.Conn) {
 	} else {
 		ReplyBulkString(con, value)
 	}
+}
+
+func (cmd *InfoCommand) Execute(con net.Conn) {
+	if len(cmd.args) == 0 {
+		ReplySimpleError(con, "unsupported option. Currently only info replication is supported")
+		return
+	}
+	if len(cmd.args) > 1 {
+		ReplySimpleError(con, "wrong number of arguments for 'info' command.")
+		return
+	}
+
+	if cmd.args[0] != "replication" {
+		ReplySimpleError(con, "syntax error")
+		return
+	}
+
+	ReplyBulkString(con, store.Info.String())
 }
