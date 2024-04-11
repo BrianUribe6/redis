@@ -6,33 +6,46 @@ import (
 	"net"
 	"strconv"
 
+	command "github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/parser"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 var portNumFlag = flag.Int("port", 6379, "the port at which the server will be listening to")
-var replicaOfFlag = flag.String("replicaof", "localhost", "the address of this server master")
+var masterHostname = flag.String("replicaof", "localhost", "the address of this server master")
 
 func main() {
 	flag.Parse()
 
 	if isReplica() {
-		replicaPort := flag.Arg(0)
-		if len(replicaPort) == 0 {
+		masterPort := flag.Arg(0)
+		if len(masterPort) == 0 {
 			fmt.Println("you must provide the master's port number")
 			return
 		}
-		_, err := strconv.Atoi(replicaPort)
+		_, err := strconv.Atoi(masterPort)
 		if err != nil {
 			fmt.Println("invalid port number")
 			return
 		}
 		store.Info.SetRole(store.SLAVE_ROLE)
+
+		sendHandshake(*masterHostname + ":" + masterPort)
 	}
 
 	address := fmt.Sprint("0.0.0.0:", *portNumFlag)
 
 	startServer(address)
+}
+
+func sendHandshake(masterAddress string) {
+	con, err := net.Dial("tcp", masterAddress)
+	if err != nil {
+		panic("failed to connect to master\n" + err.Error())
+	}
+	defer con.Close()
+
+	command.ReplyArrayBulk(con, []string{"PING"})
 }
 
 func startServer(address string) {
