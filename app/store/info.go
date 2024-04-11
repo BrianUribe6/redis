@@ -2,6 +2,8 @@ package store
 
 import (
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
 type ReplicationInfo struct {
@@ -23,7 +25,9 @@ const (
 )
 
 var Info ReplicationInfo = ReplicationInfo{
-	role: MASTER_ROLE,
+	role:             MASTER_ROLE,
+	masterReplId:     uuid.New().String(),
+	masterReplOffset: 0,
 }
 
 func (r *ReplicationInfo) SetRole(role string) {
