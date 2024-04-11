@@ -16,6 +16,13 @@ type CommandParser struct {
 var EOF error = errors.New("reached end of file")
 var errSyntax error = errors.New("syntax error")
 
+const (
+	ARRAY_TYPE       = '*'
+	BULK_STRING_TYPE = '$'
+	CR               = '\r'
+	LF               = '\n'
+)
+
 func New(buffer []byte) CommandParser {
 	parser := CommandParser{
 		buffer: buffer,
@@ -39,8 +46,8 @@ func (p *CommandParser) next() (byte, error) {
 
 func (p *CommandParser) Parse() (*command.Executor, error) {
 	token, _ := p.next()
-	if token != '*' {
-		return nil, fmt.Errorf("expected '*' got %c instead", token)
+	if token != ARRAY_TYPE {
+		return nil, fmt.Errorf("expected '%c' got %c instead", ARRAY_TYPE, token)
 	}
 	arrLength, err := p.ParseNumber()
 	if err != nil {
@@ -62,7 +69,7 @@ func (p *CommandParser) Parse() (*command.Executor, error) {
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
-	if rune(p.peek()) != '$' {
+	if rune(p.peek()) != BULK_STRING_TYPE {
 		return "", errors.New("a bulk string must start with $")
 	}
 	p.next()
@@ -85,11 +92,11 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 
 func (p *CommandParser) parseCRLF() error {
 	token, _ := p.next()
-	if rune(token) != '\r' {
+	if rune(token) != CR {
 		return errSyntax
 	}
 	token, _ = p.next()
-	if token != '\n' {
+	if token != LF {
 		return errSyntax
 	}
 	return nil
@@ -107,7 +114,7 @@ func (p *CommandParser) ParseNumber() (int, error) {
 		token, err = p.next()
 	}
 
-	if next, _ := p.next(); token != '\r' || next != '\n' {
+	if next, _ := p.next(); token != CR || next != LF {
 		return 0, errSyntax
 	}
 	return arrLength, nil
