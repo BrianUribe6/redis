@@ -26,6 +26,13 @@ var Info ReplicationInfo = ReplicationInfo{
 	role: MASTER_ROLE,
 }
 
+func (r *ReplicationInfo) SetRole(role string) {
+	if role != MASTER_ROLE && role != SLAVE_ROLE {
+		panic("Invalid role")
+	}
+	r.role = role
+}
+
 func (r *ReplicationInfo) String() string {
 	return fmt.Sprint(
 		"role:", r.role, "\n",
