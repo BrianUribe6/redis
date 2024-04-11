@@ -9,6 +9,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
+const errWrongNumberOfArgs = "wrong number of arguments"
+
 type Executor interface {
 	Execute(conn net.Conn)
 }
@@ -47,13 +49,13 @@ func (cmd *PingCommand) Execute(con net.Conn) {
 	} else if len(cmd.args) == 1 {
 		ReplyBulkString(con, cmd.args[0])
 	} else {
-		ReplySimpleError(con, "wrong number of arguments for 'ping' command.")
+		ReplySimpleError(con, errWrongNumberOfArgs)
 	}
 }
 
 func (cmd *EchoCommand) Execute(con net.Conn) {
 	if len(cmd.args) != 1 {
-		ReplySimpleError(con, "wrong number of arguments for 'echo' command.")
+		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
 	ReplyBulkString(con, cmd.args[0])
@@ -67,7 +69,7 @@ func (cmd *SetCommand) Execute(con net.Conn) {
 	numArgs := len(cmd.args)
 	// TODO write a proper flag parser
 	if numArgs != 2 && numArgs != 4 {
-		ReplySimpleError(con, "wrong number of arguments for 'set' command.")
+		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
 	key := cmd.args[0]
@@ -95,7 +97,7 @@ func (cmd *SetCommand) Execute(con net.Conn) {
 
 func (cmd *GetCommand) Execute(con net.Conn) {
 	if len(cmd.args) != 1 {
-		ReplySimpleError(con, "wrong number of arguments for 'get' command.")
+		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
 	value, exist := store.Get(cmd.args[0])
@@ -112,7 +114,7 @@ func (cmd *InfoCommand) Execute(con net.Conn) {
 		return
 	}
 	if len(cmd.args) > 1 {
-		ReplySimpleError(con, "wrong number of arguments for 'info' command.")
+		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
 
