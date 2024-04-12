@@ -156,7 +156,7 @@ func (cmd *ReplConfCommand) Execute(con net.Conn) {
 }
 
 func (cmd *PSYNCCommand) Execute(con net.Conn) {
-	if len(cmd.args) != 3 {
+	if len(cmd.args) != 2 {
 		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}

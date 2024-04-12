@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -26,7 +27,7 @@ const (
 
 var Info ReplicationInfo = ReplicationInfo{
 	role:             MASTER_ROLE,
-	MasterReplId:     uuid.New().String(),
+	MasterReplId:     strings.Replace(uuid.NewString(), "-", "", -1),
 	MasterReplOffset: 0,
 }
 
