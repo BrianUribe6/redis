@@ -8,15 +8,15 @@ import (
 
 type ReplicationInfo struct {
 	role                       string
-	connectedSlaves            uint
-	masterFailoverState        string
-	masterReplId               string
-	masterReplOffset           int
-	secondReplOffset           int
-	replBacklogActive          int
-	replBacklogSize            int
-	replBacklogFirstByteOffset int
-	replBacklogHistLen         int
+	ConnectedSlaves            uint
+	MasterFailoverState        string
+	MasterReplId               string
+	MasterReplOffset           int
+	SecondReplOffset           int
+	ReplBacklogActive          int
+	ReplBacklogSize            int
+	ReplBacklogFirstByteOffset int
+	ReplBacklogHistLen         int
 }
 
 const (
@@ -26,8 +26,8 @@ const (
 
 var Info ReplicationInfo = ReplicationInfo{
 	role:             MASTER_ROLE,
-	masterReplId:     uuid.New().String(),
-	masterReplOffset: 0,
+	MasterReplId:     uuid.New().String(),
+	MasterReplOffset: 0,
 }
 
 func (r *ReplicationInfo) SetRole(role string) {
@@ -40,15 +40,15 @@ func (r *ReplicationInfo) SetRole(role string) {
 func (r *ReplicationInfo) String() string {
 	return fmt.Sprint(
 		"role:", r.role, "\n",
-		"connected_slaves:", r.connectedSlaves, "\n",
-		"master_failover_state:", r.masterFailoverState, "\n",
-		"master_replid:", r.masterReplId, "\n",
-		"master_repl_offset:", r.masterReplOffset, "\n",
-		"second_repl_offset:", r.secondReplOffset, "\n",
-		"repl_backlog_active:", r.replBacklogActive, "\n",
-		"repl_backlog_size:", r.replBacklogSize, "\n",
-		"repl_backlog_first_byte_offset:", r.replBacklogFirstByteOffset, "\n",
-		"repl_backlog_histlen:", r.replBacklogHistLen, "\n",
+		"connected_slaves:", r.ConnectedSlaves, "\n",
+		"master_failover_state:", r.MasterFailoverState, "\n",
+		"master_replid:", r.MasterReplId, "\n",
+		"master_repl_offset:", r.MasterReplOffset, "\n",
+		"second_repl_offset:", r.SecondReplOffset, "\n",
+		"repl_backlog_active:", r.ReplBacklogActive, "\n",
+		"repl_backlog_size:", r.ReplBacklogSize, "\n",
+		"repl_backlog_first_byte_offset:", r.ReplBacklogFirstByteOffset, "\n",
+		"repl_backlog_histlen:", r.ReplBacklogHistLen, "\n",
 	)
 
 }
