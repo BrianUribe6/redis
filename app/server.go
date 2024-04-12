@@ -45,12 +45,13 @@ func handshake(masterHostname string, masterPort string) {
 		panic("failed to connect to master\n" + err.Error())
 	}
 	defer con.Close()
+
 	commands := [][]string{
 		{"PING"},
 		{"REPLCONF", "listening-port", fmt.Sprint(*portNumFlag)},
 		{"REPLCONF", "capa", "psync2"},
+		{"PSYNC", "?", "-1"},
 	}
-
 	buffer := make([]byte, 256)
 	for _, cmd := range commands {
 		command.ReplyArrayBulk(con, cmd)

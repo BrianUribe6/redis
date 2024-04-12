@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -29,6 +30,7 @@ type SetCommand Command
 type GetCommand Command
 type InfoCommand Command
 type REPLCommand Command
+type PSYNCCommand Command
 type NotImplementedCommand Command
 
 func New(label string, params []string) Executor {
@@ -45,6 +47,8 @@ func New(label string, params []string) Executor {
 		return &InfoCommand{label, params}
 	case "repl":
 		return &REPLCommand{label, params}
+	case "psync":
+		return &PSYNCCommand{label, params}
 	}
 	return &NotImplementedCommand{}
 }
@@ -133,10 +137,11 @@ func (cmd *InfoCommand) Execute(con net.Conn) {
 }
 
 func (cmd *REPLCommand) Execute(con net.Conn) {
-	if len(cmd.args) != 2 {
+	if len(cmd.args) < 2 {
 		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
+	// TODO
 	switch cmd.args[1] {
 	case "listening-port":
 		break
@@ -148,4 +153,14 @@ func (cmd *REPLCommand) Execute(con net.Conn) {
 	}
 
 	ReplySuccess(con)
+}
+
+func (cmd *PSYNCCommand) Execute(con net.Conn) {
+	if len(cmd.args) != 3 {
+		ReplySimpleError(con, errWrongNumberOfArgs)
+		return
+	}
+
+	response := fmt.Sprintf("FULLRESYNC %s 0", store.Info.MasterReplId)
+	ReplySimpleString(con, response)
 }
