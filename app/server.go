@@ -30,7 +30,7 @@ func main() {
 		}
 		store.Info.SetRole(store.SLAVE_ROLE)
 
-		sendHandshake(*masterHostname + ":" + masterPort)
+		handshake(*masterHostname, masterPort)
 	}
 
 	address := fmt.Sprint("0.0.0.0:", *portNumFlag)
@@ -38,14 +38,27 @@ func main() {
 	startServer(address)
 }
 
-func sendHandshake(masterAddress string) {
-	con, err := net.Dial("tcp", masterAddress)
+func handshake(masterHostname string, masterPort string) {
+	addr := masterHostname + ":" + masterPort
+	con, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic("failed to connect to master\n" + err.Error())
 	}
 	defer con.Close()
+	commands := [][]string{
+		{"PING"},
+		{"REPLCONF", "listening-port", fmt.Sprint(*portNumFlag)},
+		{"REPLCONF", "capa", "psync2"},
+	}
 
-	command.ReplyArrayBulk(con, []string{"PING"})
+	buffer := make([]byte, 256)
+	for _, cmd := range commands {
+		command.ReplyArrayBulk(con, cmd)
+		_, err = con.Read(buffer)
+		if err != nil {
+			panic("failed to establish handshake with master node")
+		}
+	}
 }
 
 func startServer(address string) {

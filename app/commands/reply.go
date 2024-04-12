@@ -36,6 +36,10 @@ func ReplyArrayBulk(conn net.Conn, arr []string) {
 	conn.Write([]byte(sb.String()))
 }
 
+func ReplySuccess(conn net.Conn) {
+	ReplySimpleString(conn, "OK")
+}
+
 func createBulkString(msg string) string {
 	lenght := len(msg)
 	s := fmt.Sprintf("$%d\r\n%s\r\n", lenght, msg)

@@ -9,7 +9,10 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-const errWrongNumberOfArgs = "wrong number of arguments"
+const (
+	errWrongNumberOfArgs = "wrong number of arguments"
+	errSyntax            = "syntax error"
+)
 
 type Executor interface {
 	Execute(conn net.Conn)
@@ -25,6 +28,7 @@ type EchoCommand Command
 type SetCommand Command
 type GetCommand Command
 type InfoCommand Command
+type REPLCommand Command
 type NotImplementedCommand Command
 
 func New(label string, params []string) Executor {
@@ -39,6 +43,8 @@ func New(label string, params []string) Executor {
 		return &GetCommand{label, params}
 	case "info":
 		return &InfoCommand{label, params}
+	case "repl":
+		return &REPLCommand{label, params}
 	}
 	return &NotImplementedCommand{}
 }
@@ -79,7 +85,7 @@ func (cmd *SetCommand) Execute(con net.Conn) {
 	if numArgs == 4 {
 		pxFlag := strings.ToLower(cmd.args[2])
 		if pxFlag != "px" {
-			ReplySimpleError(con, "syntax error")
+			ReplySimpleError(con, errSyntax)
 			return
 		}
 
@@ -92,7 +98,7 @@ func (cmd *SetCommand) Execute(con net.Conn) {
 	}
 
 	store.Set(key, value, expiry)
-	ReplyBulkString(con, "OK")
+	ReplySuccess(con)
 }
 
 func (cmd *GetCommand) Execute(con net.Conn) {
@@ -119,9 +125,27 @@ func (cmd *InfoCommand) Execute(con net.Conn) {
 	}
 
 	if cmd.args[0] != "replication" {
-		ReplySimpleError(con, "syntax error")
+		ReplySimpleError(con, errSyntax)
 		return
 	}
 
 	ReplyBulkString(con, store.Info.String())
+}
+
+func (cmd *REPLCommand) Execute(con net.Conn) {
+	if len(cmd.args) != 2 {
+		ReplySimpleError(con, errWrongNumberOfArgs)
+		return
+	}
+	switch cmd.args[1] {
+	case "listening-port":
+		break
+	case "capa":
+		break
+	default:
+		ReplySimpleError(con, errSyntax)
+		return
+	}
+
+	ReplySuccess(con)
 }
