@@ -29,7 +29,7 @@ type EchoCommand Command
 type SetCommand Command
 type GetCommand Command
 type InfoCommand Command
-type REPLCommand Command
+type ReplConfCommand Command
 type PSYNCCommand Command
 type NotImplementedCommand Command
 
@@ -45,8 +45,8 @@ func New(label string, params []string) Executor {
 		return &GetCommand{label, params}
 	case "info":
 		return &InfoCommand{label, params}
-	case "repl":
-		return &REPLCommand{label, params}
+	case "replconf":
+		return &ReplConfCommand{label, params}
 	case "psync":
 		return &PSYNCCommand{label, params}
 	}
@@ -136,13 +136,13 @@ func (cmd *InfoCommand) Execute(con net.Conn) {
 	ReplyBulkString(con, store.Info.String())
 }
 
-func (cmd *REPLCommand) Execute(con net.Conn) {
+func (cmd *ReplConfCommand) Execute(con net.Conn) {
 	if len(cmd.args) < 2 {
 		ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
 	// TODO
-	switch cmd.args[1] {
+	switch cmd.args[0] {
 	case "listening-port":
 		break
 	case "capa":
