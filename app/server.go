@@ -6,8 +6,8 @@ import (
 	"net"
 	"strconv"
 
-	command "github.com/codecrafters-io/redis-starter-go/app/commands"
-	"github.com/codecrafters-io/redis-starter-go/app/parser"
+	resp "github.com/codecrafters-io/redis-starter-go/app/resp"
+	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
@@ -54,7 +54,7 @@ func handshake(masterHostname string, masterPort string) {
 	}
 	buffer := make([]byte, 256)
 	for _, cmd := range commands {
-		command.ReplyArrayBulk(con, cmd)
+		resp.ReplyArrayBulk(con, cmd)
 		_, err = con.Read(buffer)
 		if err != nil {
 			panic("failed to establish handshake with master node")
@@ -88,7 +88,7 @@ func handleClient(conn net.Conn) {
 		if err != nil {
 			break
 		}
-		commandParser := parser.New(buff)
+		commandParser := parser.NewCommandParser(buff)
 		cmd, err := commandParser.Parse()
 		if err != nil {
 			break

@@ -23,7 +23,7 @@ const (
 	LF               = '\n'
 )
 
-func New(buffer []byte) CommandParser {
+func NewCommandParser(buffer []byte) CommandParser {
 	parser := CommandParser{
 		buffer: buffer,
 		pos:    0,
@@ -106,12 +106,11 @@ func (p *CommandParser) ParseNumber() (int, error) {
 	arrLength := 0
 	var token byte
 	var err error
-	for token, err = p.next(); isDigit(token); {
+	for token, err = p.next(); isDigit(token); token, err = p.next() {
 		if err != nil {
 			return 0, errSyntax
 		}
 		arrLength = arrLength*10 + int(token) - '0'
-		token, err = p.next()
 	}
 
 	if next, _ := p.next(); token != CR || next != LF {

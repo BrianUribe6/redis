@@ -3,7 +3,7 @@ package parser_test
 import (
 	"testing"
 
-	"github.com/codecrafters-io/redis-starter-go/app/parser"
+	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 )
 
 func TestParseNumber(t *testing.T) {
@@ -43,7 +43,7 @@ func TestParseNumber(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			parser := parser.New(test.input)
+			parser := parser.NewCommandParser(test.input)
 			value, err := parser.ParseNumber()
 			if test.shouldError {
 				if err == nil {
@@ -82,7 +82,7 @@ func TestParseBulkString(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			parser := parser.New(test.input)
+			parser := parser.NewCommandParser(test.input)
 			value, err := parser.ParseBulkString()
 			if test.shouldError {
 				if err == nil {
