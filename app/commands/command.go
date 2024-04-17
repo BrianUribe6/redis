@@ -2,7 +2,10 @@ package command
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"net"
+	"os"
 	"strings"
 
 	"strconv"
@@ -12,6 +15,7 @@ import (
 )
 
 const (
+	RDB_FILENAME         = "dump.rdb"
 	errWrongNumberOfArgs = "wrong number of arguments"
 	errSyntax            = "syntax error"
 )
@@ -161,7 +165,42 @@ func (cmd *PSYNCCommand) Execute(con net.Conn) {
 		resp.ReplySimpleError(con, errWrongNumberOfArgs)
 		return
 	}
-
+	log.Println("Received synchronization request from", con.RemoteAddr().String())
+	// 1. Notify replica that it should expect a full copy of the database
 	response := fmt.Sprintf("FULLRESYNC %s 0", store.Info.MasterReplId)
 	resp.ReplySimpleString(con, response)
+
+	// 2. Read the file dump of the database
+	log.Println("Loading RDB...")
+	rdbFile, err := os.Open(RDB_FILENAME)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer rdbFile.Close()
+
+	fileInfo, err := rdbFile.Stat()
+	if err != nil {
+		log.Println("unable to gather info from RDB")
+		return
+	}
+	// 3. Format it as a RESP file syntax and send it in CHUNKS
+	// RESP Syntax for sending files is $<length_of_file>\r\n<contents_of_file>
+	con.Write([]byte(fmt.Sprintf("$%d\r\n", fileInfo.Size())))
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := rdbFile.Read(buf)
+		if err != nil && err != io.EOF {
+			log.Println(err)
+			break
+		}
+		if err == io.EOF {
+			break
+		}
+
+		con.Write(buf[:n])
+	}
+
+	log.Printf("Syncronization with replica %s succeeded", con.RemoteAddr().String())
 }

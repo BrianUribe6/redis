@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net"
-	"strconv"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/resp"
+	command "github.com/codecrafters-io/redis-starter-go/app/commands"
 	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 var portNumFlag = flag.Int("port", 6379, "the port at which the server will be listening to")
@@ -19,47 +18,12 @@ func main() {
 
 	if isReplica() {
 		masterPort := flag.Arg(0)
-		if len(masterPort) == 0 {
-			fmt.Println("you must provide the master's port number")
-			return
-		}
-		_, err := strconv.Atoi(masterPort)
-		if err != nil {
-			fmt.Println("invalid port number")
-			return
-		}
-		store.Info.SetRole(store.SLAVE_ROLE)
-
-		handshake(*masterHostname, masterPort)
+		configureReplica(*masterHostname, masterPort)
 	}
 
 	address := fmt.Sprint("0.0.0.0:", *portNumFlag)
 
 	startServer(address)
-}
-
-func handshake(masterHostname string, masterPort string) {
-	addr := masterHostname + ":" + masterPort
-	con, err := net.Dial("tcp", addr)
-	if err != nil {
-		panic("failed to connect to master\n" + err.Error())
-	}
-	defer con.Close()
-
-	commands := [][]string{
-		{"PING"},
-		{"REPLCONF", "listening-port", fmt.Sprint(*portNumFlag)},
-		{"REPLCONF", "capa", "psync2"},
-		{"PSYNC", "?", "-1"},
-	}
-	buffer := make([]byte, 256)
-	for _, cmd := range commands {
-		resp.ReplyArrayBulk(con, cmd)
-		_, err = con.Read(buffer)
-		if err != nil {
-			panic("failed to establish handshake with master node")
-		}
-	}
 }
 
 func startServer(address string) {
@@ -69,7 +33,7 @@ func startServer(address string) {
 	}
 	defer listener.Close()
 
-	fmt.Printf("Server running on %s", address)
+	log.Printf("Server running at %s\n", address)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -84,16 +48,16 @@ func handleClient(conn net.Conn) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
 	for {
-		_, err := conn.Read(buff)
+		n, err := conn.Read(buff)
 		if err != nil {
 			break
 		}
-		commandParser := parser.NewCommandParser(buff)
-		cmd, err := commandParser.Parse()
+		commandParser := parser.NewCommandParser(buff[:n])
+		c, err := commandParser.Parse()
 		if err != nil {
 			break
 		}
-		(*cmd).Execute(conn)
+		command.New(c.Label, c.Args).Execute(conn)
 	}
 }
 

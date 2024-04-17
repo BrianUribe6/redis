@@ -2,10 +2,7 @@ package parser
 
 import (
 	"errors"
-	"fmt"
 	"strings"
-
-	command "github.com/codecrafters-io/redis-starter-go/app/commands"
 )
 
 type CommandParser struct {
@@ -13,14 +10,20 @@ type CommandParser struct {
 	pos    int
 }
 
+type Command struct {
+	Label string
+	Args  []string
+}
+
 var EOF error = errors.New("reached end of file")
 var errSyntax error = errors.New("syntax error")
 
 const (
-	ARRAY_TYPE       = '*'
-	BULK_STRING_TYPE = '$'
-	CR               = '\r'
-	LF               = '\n'
+	ARRAY_TYPE         = '*'
+	BULK_STRING_TYPE   = '$'
+	SIMPLE_STRING_TYPE = '+'
+	CR                 = '\r'
+	LF                 = '\n'
 )
 
 func NewCommandParser(buffer []byte) CommandParser {
@@ -31,11 +34,11 @@ func NewCommandParser(buffer []byte) CommandParser {
 	return parser
 }
 
-func (p *CommandParser) peek() byte {
+func (p *CommandParser) Peek() byte {
 	return p.buffer[p.pos]
 }
 
-func (p *CommandParser) next() (byte, error) {
+func (p *CommandParser) Next() (byte, error) {
 	if p.pos < len(p.buffer) {
 		val := p.buffer[p.pos]
 		p.pos++
@@ -44,10 +47,10 @@ func (p *CommandParser) next() (byte, error) {
 	return 0, EOF
 }
 
-func (p *CommandParser) Parse() (*command.Executor, error) {
-	token, _ := p.next()
+func (p *CommandParser) Parse() (*Command, error) {
+	token, _ := p.Next()
 	if token != ARRAY_TYPE {
-		return nil, fmt.Errorf("expected '%c' got %c instead", ARRAY_TYPE, token)
+		return nil, errSyntax
 	}
 	arrLength, err := p.ParseNumber()
 	if err != nil {
@@ -62,17 +65,24 @@ func (p *CommandParser) Parse() (*command.Executor, error) {
 		}
 		args = append(args, s)
 	}
+	cmd := &Command{args[0], args[1:]}
 
-	c := command.New(args[0], args[1:])
+	return cmd, nil
+}
 
-	return &c, nil
+func (p *CommandParser) ParseSimpleString() (string, error) {
+	token, _ := p.Next()
+	if token != SIMPLE_STRING_TYPE {
+		return "", errSyntax
+	}
+	return p.parseString()
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
-	if rune(p.peek()) != BULK_STRING_TYPE {
+	if rune(p.Peek()) != BULK_STRING_TYPE {
 		return "", errors.New("a bulk string must start with $")
 	}
-	p.next()
+	p.Next()
 	length, err := p.ParseNumber()
 	if err != nil {
 		return "", err
@@ -80,7 +90,7 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 
 	var sb strings.Builder
 	for i := 0; i < length; i++ {
-		token, err := p.next()
+		token, err := p.Next()
 		if err != nil {
 			return "", errSyntax
 		}
@@ -90,12 +100,31 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 	return sb.String(), err
 }
 
+func (p *CommandParser) parseString() (string, error) {
+	token, err := p.Next()
+	var sb strings.Builder
+	for token != CR {
+		token, err := p.Next()
+		if err != nil {
+			return "", err
+		}
+		sb.WriteByte(token)
+	}
+	if token, _ = p.Next(); token != CR {
+		return "", errSyntax
+	}
+	if token, _ = p.Next(); token != LF {
+		return "", errSyntax
+	}
+	return sb.String(), err
+}
+
 func (p *CommandParser) parseCRLF() error {
-	token, _ := p.next()
+	token, _ := p.Next()
 	if rune(token) != CR {
 		return errSyntax
 	}
-	token, _ = p.next()
+	token, _ = p.Next()
 	if token != LF {
 		return errSyntax
 	}
@@ -106,14 +135,14 @@ func (p *CommandParser) ParseNumber() (int, error) {
 	arrLength := 0
 	var token byte
 	var err error
-	for token, err = p.next(); isDigit(token); token, err = p.next() {
+	for token, err = p.Next(); isDigit(token); token, err = p.Next() {
 		if err != nil {
 			return 0, errSyntax
 		}
 		arrLength = arrLength*10 + int(token) - '0'
 	}
 
-	if next, _ := p.next(); token != CR || next != LF {
+	if next, _ := p.Next(); token != CR || next != LF {
 		return 0, errSyntax
 	}
 	return arrLength, nil
