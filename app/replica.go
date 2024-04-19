@@ -24,11 +24,11 @@ func configureReplica(masterHostname string, masterPort string) {
 	log.Println("Initiating server in replica mode")
 	store.Info.SetRole(store.SLAVE_ROLE)
 	if len(masterPort) == 0 {
-		log.Panic(errMissingPort)
+		log.Fatal(errMissingPort)
 	}
 	_, err := strconv.Atoi(masterPort)
 	if err != nil {
-		log.Panic(errInvalidPort)
+		log.Fatal(errInvalidPort)
 	}
 
 	handshake(masterHostname + ":" + masterPort)
@@ -38,7 +38,7 @@ func handshake(masterAddress string) {
 	con, err := net.Dial("tcp", masterAddress)
 	log.Printf("Attempting to connect to master at %s\n", masterAddress)
 	if err != nil {
-		log.Panic("failed to connect" + err.Error())
+		log.Fatal("failed to connect" + err.Error())
 	}
 	defer con.Close()
 
@@ -56,46 +56,62 @@ func handshake(masterAddress string) {
 		resp.ReplyArrayBulk(con, cmd)
 		n, err = con.Read(buffer)
 		if err != nil {
-			log.Panic(errHandshakeFail)
+			log.Fatal(errHandshakeFail)
 		}
 	}
 	log.Println("Handshake successful. Waiting for full resync...")
-	assertFullResync(buffer[:n])
-	resyncWithMaster(con)
+
+	assertFullResyncReceived(buffer[:n])
+	// After replying with a fullresync the master should be sending
+	// an RDB file with the full database contents
+	resyncWithMaster(con, buffer)
 
 	log.Println("Full resync done.")
 }
 
-// Asserts buffer contens are formatted as a valid RESP FULLRESYNC command
+// Asserts buffer contents are formatted as valid FULLRESYNC command.
+//
+// expected format: +FULLRESYNC <master_replid> <offset>\r\n
 //
 // On success, returns the master's replication id
-func assertFullResync(buffer []byte) string {
-	message := strings.Split(string(buffer), " ")
-	log.Println("PSYNC replied", message)
-	// expect +FULLRESYNC <master_replid> 0 encoded as a SIMPLE string
+func assertFullResyncReceived(buffer []byte) string {
+	p := parser.NewCommandParser(buffer)
+
+	s, err := p.ParseSimpleString()
+	if err != nil {
+		log.Fatal(errInvalidAck)
+	}
+	log.Println("PSYNC replied with:", s)
+
+	message := strings.Split(s, " ")
 	if len(message) != 3 {
 		log.Fatal(errUnexpected)
 	}
-	if strings.ToLower(message[0]) != "+fullresync" {
-		log.Fatal(errUnexpected)
+	label := message[0]
+	// masterIReplId := message[1]
+	if strings.ToLower(label) != "fullresync" {
+		log.Fatal("invalid command")
 	}
-	if message[2] != "0\r\n" {
-		log.Fatal(errUnexpected)
+
+	_, err = strconv.Atoi(message[2]) // offset
+
+	if err != nil {
+		log.Fatalf("invalid offset")
 	}
 
 	return message[1]
 }
 
-func resyncWithMaster(con net.Conn) {
+func resyncWithMaster(con net.Conn, buffer []byte) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
-	buf := make([]byte, 1024)
-	_, err := con.Read(buf)
+	n, err := con.Read(buffer)
 	if err != nil {
 		log.Fatal(err)
 	}
-	p := parser.NewCommandParser(buf)
+
+	p := parser.NewCommandParser(buffer[:n])
 	token, err := p.Next()
-	if token != parser.BULK_STRING_TYPE || err != nil {
+	if err != nil || token != parser.BULK_STRING_TYPE {
 		log.Fatal(errUnexpected)
 	}
 
@@ -103,5 +119,5 @@ func resyncWithMaster(con net.Conn) {
 	if err != nil {
 		log.Fatal(errUnexpected)
 	}
-
+	//TODO do something with the file
 }

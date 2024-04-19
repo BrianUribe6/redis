@@ -47,6 +47,10 @@ func (p *CommandParser) Next() (byte, error) {
 	return 0, EOF
 }
 
+func (p *CommandParser) Position() int {
+	return p.pos
+}
+
 func (p *CommandParser) Parse() (*Command, error) {
 	token, _ := p.Next()
 	if token != ARRAY_TYPE {
@@ -75,7 +79,17 @@ func (p *CommandParser) ParseSimpleString() (string, error) {
 	if token != SIMPLE_STRING_TYPE {
 		return "", errSyntax
 	}
-	return p.parseString()
+
+	var sb strings.Builder
+	for p.Peek() != CR {
+		token, err := p.Next()
+		if err != nil {
+			return "", err
+		}
+		sb.WriteByte(token)
+	}
+	err := p.parseCRLF()
+	return sb.String(), err
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
@@ -97,25 +111,6 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 		sb.WriteByte(token)
 	}
 	err = p.parseCRLF()
-	return sb.String(), err
-}
-
-func (p *CommandParser) parseString() (string, error) {
-	token, err := p.Next()
-	var sb strings.Builder
-	for token != CR {
-		token, err := p.Next()
-		if err != nil {
-			return "", err
-		}
-		sb.WriteByte(token)
-	}
-	if token, _ = p.Next(); token != CR {
-		return "", errSyntax
-	}
-	if token, _ = p.Next(); token != LF {
-		return "", errSyntax
-	}
 	return sb.String(), err
 }
 
