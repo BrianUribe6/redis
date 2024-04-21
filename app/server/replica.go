@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -15,26 +15,17 @@ import (
 const (
 	errInvalidAck    = "Invalid acknowledgement, expected FULLRESYNC"
 	errUnexpected    = "Received unexpected response from master"
-	errMissingPort   = "You must provide the master's port number"
-	errInvalidPort   = "Invalid port numbers"
 	errHandshakeFail = "Failed to establish handshake with master"
 )
 
-func configureReplica(masterHostname string, masterPort string) {
+func configureReplica(listeningPort int, masterAddress string) {
 	log.Println("Initiating server in replica mode")
 	store.Info.SetRole(store.SLAVE_ROLE)
-	if len(masterPort) == 0 {
-		log.Fatal(errMissingPort)
-	}
-	_, err := strconv.Atoi(masterPort)
-	if err != nil {
-		log.Fatal(errInvalidPort)
-	}
 
-	handshake(masterHostname + ":" + masterPort)
+	handshake(listeningPort, masterAddress)
 }
 
-func handshake(masterAddress string) {
+func handshake(listeningPort int, masterAddress string) {
 	con, err := net.Dial("tcp", masterAddress)
 	log.Printf("Attempting to connect to master at %s\n", masterAddress)
 	if err != nil {
@@ -44,7 +35,7 @@ func handshake(masterAddress string) {
 
 	commands := [][]string{
 		{"PING"},
-		{"REPLCONF", "listening-port", fmt.Sprint(*portNumFlag)},
+		{"REPLCONF", "listening-port", fmt.Sprint(listeningPort)},
 		{"REPLCONF", "capa", "psync2"},
 		{"PSYNC", "?", "-1"},
 	}

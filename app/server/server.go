@@ -1,7 +1,6 @@
-package main
+package server
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -10,26 +9,23 @@ import (
 	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 )
 
-var portNumFlag = flag.Int("port", 6379, "the port at which the server will be listening to")
-var masterHostname = flag.String("replicaof", "localhost", "the address of this server master")
-
-func main() {
-	flag.Parse()
-
-	if isReplica() {
-		masterPort := flag.Arg(0)
-		configureReplica(*masterHostname, masterPort)
-	}
-
-	address := fmt.Sprint("0.0.0.0:", *portNumFlag)
-
-	startServer(address)
+type Server struct {
+	hostname string
+	port     int
 }
 
-func startServer(address string) {
+func New(hostname string, port int) *Server {
+	return &Server{
+		hostname: hostname,
+		port:     port,
+	}
+}
+
+func (s *Server) Listen() {
+	address := fmt.Sprintf("%s:%d", s.hostname, s.port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		panic(err)
+		log.Fatal("ERROR: ", err)
 	}
 	defer listener.Close()
 
@@ -37,7 +33,7 @@ func startServer(address string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection: ", err)
+			log.Println("Error accepting connection: ", err)
 			continue
 		}
 		go handleClient(conn)
@@ -61,13 +57,7 @@ func handleClient(conn net.Conn) {
 	}
 }
 
-func isReplica() bool {
-	isSet := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "replicaof" {
-			isSet = true
-		}
-	})
-
-	return isSet
+func (s *Server) AsReplica(masterHostname string, masterPort int) {
+	masterAddr := fmt.Sprintf("%s:%d", masterHostname, masterPort)
+	configureReplica(s.port, masterAddr)
 }
