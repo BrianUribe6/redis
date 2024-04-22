@@ -67,7 +67,8 @@ func (p *CommandParser) Parse() (*Command, error) {
 		if err != nil {
 			return nil, err
 		}
-		args = append(args, s)
+		//commands are case-insensitive
+		args = append(args, strings.ToLower(s))
 	}
 	cmd := &Command{args[0], args[1:]}
 

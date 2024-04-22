@@ -12,12 +12,14 @@ import (
 type Server struct {
 	hostname string
 	port     int
+	replicas []net.Conn
 }
 
 func New(hostname string, port int) *Server {
 	return &Server{
 		hostname: hostname,
 		port:     port,
+		replicas: []net.Conn{},
 	}
 }
 
@@ -36,13 +38,13 @@ func (s *Server) Listen() {
 			log.Println("Error accepting connection: ", err)
 			continue
 		}
-		go handleClient(conn)
+		go s.handleClient(conn)
 	}
 }
 
-func handleClient(conn net.Conn) {
-	defer conn.Close()
+func (s *Server) handleClient(conn net.Conn) {
 	buff := make([]byte, 1024)
+	isReplica := false
 	for {
 		n, err := conn.Read(buff)
 		if err != nil {
@@ -51,9 +53,36 @@ func handleClient(conn net.Conn) {
 		commandParser := parser.NewCommandParser(buff[:n])
 		c, err := commandParser.Parse()
 		if err != nil {
+			log.Println(err)
 			break
 		}
-		command.New(c.Label, c.Args).Execute(conn)
+		if c.Label == "psync" {
+			isReplica = true
+			s.subscribe(conn)
+		}
+
+		//TODO check if the command is mutable only "set" for now...
+		if c.Label == "set" {
+			s.notify(buff[:n])
+		}
+		cmd := command.New(c.Label, c.Args)
+
+		cmd.Execute(conn)
+	}
+	if !isReplica {
+		conn.Close()
+	}
+}
+
+// Subscribe a replica to receive commands from master
+func (s *Server) subscribe(conn net.Conn) {
+	s.replicas = append(s.replicas, conn)
+}
+
+// Send cmd to all connected replicas
+func (s *Server) notify(cmd []byte) {
+	for _, replica := range s.replicas {
+		replica.Write(cmd)
 	}
 }
 
