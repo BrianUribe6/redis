@@ -60,13 +60,12 @@ func (s *Server) handleClient(conn net.Conn) {
 			isReplica = true
 			s.subscribe(conn)
 		}
+		cmd := command.New(c.Label, c.Args)
 
 		//TODO check if the command is mutable only "set" for now...
 		if c.Label == "set" {
 			s.notify(buff[:n])
 		}
-		cmd := command.New(c.Label, c.Args)
-
 		cmd.Execute(conn)
 	}
 	if !isReplica {

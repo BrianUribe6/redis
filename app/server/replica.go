@@ -24,7 +24,7 @@ func configureReplica(listeningPort int, masterAddress string) {
 
 	client := handshake(listeningPort, masterAddress)
 
-	log.Println("Listening for master commands")
+	log.Println("Logging commands from master.")
 	listenMasterCommands(client)
 }
 
@@ -58,7 +58,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 	// After replying with a fullresync the master should be sending
 	// an RDB file with the full database contents
 	resyncWithMaster(con, buffer)
-	log.Println("Full resync done.")
+	log.Println("Full resync done")
 
 	return con
 }

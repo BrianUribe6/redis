@@ -1,9 +1,12 @@
 package command
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"os"
 
 	"github.com/codecrafters-io/redis-starter-go/app/rdb"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
@@ -23,24 +26,33 @@ func (cmd *PSYNCCommand) Execute(con net.Conn) {
 
 	// 2. Read the file dump of the database
 	log.Println("Loading RDB...")
-	reader, err := rdb.New()
+	rdb.CreateEmpty()
+
+	rdbFile, err := os.Open(rdb.FILENAME)
 	if err != nil {
-		log.Println(err)
-		return
+		log.Fatal("Failed to open RDB:", err)
 	}
-	defer reader.Close()
+	defer rdbFile.Close()
+
+	rdbFileInfo, err := rdbFile.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	reader := bufio.NewReader(rdbFile)
 
 	// 3. Format it as a RESP file syntax and send it in CHUNKS
 	// RESP Syntax for sending files is $<length_of_file>\r\n<contents_of_file>
-	file := []byte(fmt.Sprintf("$%d\r\n", reader.Info.Size()))
-	err = reader.Read(func(buffer []byte) {
+	file := []byte(fmt.Sprintf("$%d\r\n", rdbFileInfo.Size()))
 
-		// FIXME I'm sending the whole thing to satisfy codecrafter's unit test
-		// but the right thing instead is to write it in chunks i.e con.Write(buffer)
-		// (Imagine if the file was 16GB)
-		file = append(file, buffer...)
-	})
-
+	data := make([]byte, 4096)
+	for {
+		n, err := reader.Read(data)
+		if err == io.EOF {
+			break
+		}
+		file = append(file, data[:n]...)
+	}
 	con.Write(file)
 
 	if err != nil {
