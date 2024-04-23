@@ -63,16 +63,13 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 	return con
 }
 
-// Asserts buffer contents are formatted as valid FULLRESYNC command.
+// Asserts buffer contents are formatted as a valid FULLRESYNC command.
 //
 // expected format: +FULLRESYNC <master_replid> <offset>\r\n
 //
 // On success, returns the master's replication id
 func assertFullResyncReceived(buffer []byte) string {
 	p := parser.NewCommandParser(buffer)
-
-	fmt.Println(string(buffer))
-
 	s, err := p.ParseSimpleString()
 	if err != nil {
 		log.Fatal(errInvalidAck)
@@ -102,7 +99,7 @@ func resyncWithMaster(con net.Conn, buffer []byte) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
 	n, err := con.Read(buffer)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to get a response from master: ", err)
 	}
 
 	p := parser.NewCommandParser(buffer[:n])
@@ -115,6 +112,7 @@ func resyncWithMaster(con net.Conn, buffer []byte) {
 	if err != nil {
 		log.Fatal(errUnexpected)
 	}
+
 	//TODO do something with the file
 }
 
@@ -124,12 +122,14 @@ func listenMasterCommands(con net.Conn) {
 	for {
 		n, err := con.Read(buffer)
 		if err != nil {
-			log.Println("")
+			break
 		}
+
 		commandParser := parser.NewCommandParser(buffer[:n])
 		c, err := commandParser.Parse()
 		if err != nil {
-			break
+			log.Println("Could not parse command", string(buffer))
+			continue
 		}
 		log.Println(c.Label, strings.Join(c.Args, " "))
 	}
