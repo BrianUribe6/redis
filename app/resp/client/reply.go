@@ -1,31 +1,29 @@
-package resp
+package client
 
 import (
 	"fmt"
 	"strings"
-
-	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
-func ReplyBulkString(c client.Client, msg string) {
+func (c *Client) SendBulkString(msg string) {
 	c.Write([]byte(createBulkString(msg)))
 }
 
-func ReplySimpleString(c client.Client, msg string) {
+func (c *Client) SendSimpleString(msg string) {
 	s := fmt.Sprintf("+%s\r\n", msg)
 	c.Write([]byte(s))
 }
 
-func ReplySimpleError(c client.Client, errMsg string) {
+func (c *Client) SendSimpleError(errMsg string) {
 	s := fmt.Sprintf("-%s\r\n", errMsg)
 	c.Write([]byte(s))
 }
 
-func ReplyNullBulkString(c client.Client) {
+func (c *Client) SendNullBulkString() {
 	c.Write([]byte("$-1\r\n"))
 }
 
-func ReplyArrayBulk(c client.Client, values ...string) {
+func (c *Client) SendArrayBulk(values ...string) {
 	respArray := fmt.Sprintf("*%d\r\n", len(values))
 	var sb strings.Builder
 
@@ -37,8 +35,8 @@ func ReplyArrayBulk(c client.Client, values ...string) {
 	c.Write([]byte(sb.String()))
 }
 
-func ReplySuccess(c client.Client) {
-	ReplySimpleString(c, "OK")
+func (c *Client) SendSuccess() {
+	c.SendSimpleString("OK")
 }
 
 func createBulkString(msg string) string {

@@ -1,15 +1,14 @@
 package command
 
 import (
-	"net"
-
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type InfoCommand Command
 
-func (cmd *InfoCommand) Execute(con net.Conn) {
+func (cmd *InfoCommand) Execute(con client.Client) {
 	if len(cmd.args) == 0 {
 		resp.ReplySimpleError(con, "unsupported option. Currently only info replication is supported")
 		return

@@ -1,15 +1,14 @@
 package command
 
 import (
-	"net"
-
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type GetCommand Command
 
-func (cmd *GetCommand) Execute(con net.Conn) {
+func (cmd *GetCommand) Execute(con client.Client) {
 	if len(cmd.args) != 1 {
 		resp.ReplySimpleError(con, errWrongNumberOfArgs)
 		return

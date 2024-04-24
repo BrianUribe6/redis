@@ -1,17 +1,15 @@
 package command
 
 import (
-	"net"
-
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
 type EchoCommand Command
 
-func (cmd *EchoCommand) Execute(con net.Conn) {
+func (cmd *EchoCommand) Execute(con client.Client) {
 	if len(cmd.args) != 1 {
-		resp.ReplySimpleError(con, errWrongNumberOfArgs)
+		con.SendSimpleError(errWrongNumberOfArgs)
 		return
 	}
-	resp.ReplyBulkString(con, cmd.args[0])
+	con.SendBulkString(cmd.args[0])
 }

@@ -6,20 +6,21 @@ import (
 	"net"
 
 	command "github.com/codecrafters-io/redis-starter-go/app/commands"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 )
 
 type Server struct {
 	hostname string
 	port     int
-	replicas []net.Conn
+	replicas []client.Client
 }
 
 func New(hostname string, port int) *Server {
 	return &Server{
 		hostname: hostname,
 		port:     port,
-		replicas: []net.Conn{},
+		replicas: []client.Client{},
 	}
 }
 
@@ -34,54 +35,58 @@ func (s *Server) Listen() {
 	log.Printf("Server running at %s\n", address)
 	for {
 		conn, err := listener.Accept()
+		c := client.New(conn)
 		if err != nil {
 			log.Println("Error accepting connection: ", err)
 			continue
 		}
-		go s.handleClient(conn)
+		go s.handleClient(c)
 	}
 }
 
-func (s *Server) handleClient(conn net.Conn) {
+func (s *Server) handleClient(cli client.Client) {
 	buff := make([]byte, 1024)
 	isReplica := false
 	for {
-		n, err := conn.Read(buff)
+		n, err := cli.Read(buff)
 		if err != nil {
 			break
 		}
 		commandParser := parser.NewCommandParser(buff[:n])
-		c, err := commandParser.Parse()
+		parsedCmd, err := commandParser.Parse()
 		if err != nil {
 			log.Println(err)
 			break
 		}
-		if c.Label == "psync" {
+		if parsedCmd.Label == "psync" {
 			isReplica = true
-			s.subscribe(conn)
+			s.subscribe(cli)
 		}
-		cmd := command.New(c.Label, c.Args)
+		cmd := command.New(parsedCmd.Label, parsedCmd.Args)
 
 		//TODO check if the command is mutable only "set" for now...
-		if c.Label == "set" {
+		if parsedCmd.Label == "set" {
 			s.notify(buff[:n])
 		}
-		cmd.Execute(conn)
+		cmd.Execute(cli)
+
+		cli.Flush()
 	}
 	if !isReplica {
-		conn.Close()
+		cli.Close()
 	}
 }
 
 // Subscribe a replica to receive commands from master
-func (s *Server) subscribe(conn net.Conn) {
-	s.replicas = append(s.replicas, conn)
+func (s *Server) subscribe(c client.Client) {
+	s.replicas = append(s.replicas, c)
 }
 
 // Send cmd to all connected replicas
 func (s *Server) notify(cmd []byte) {
 	for _, replica := range s.replicas {
 		replica.Write(cmd)
+		replica.Flush()
 	}
 }
 

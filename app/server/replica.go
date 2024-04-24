@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -33,6 +33,7 @@ func configureReplica(listeningPort int, masterAddress string) {
 
 func handshake(listeningPort int, masterAddress string) net.Conn {
 	con, err := net.Dial("tcp", masterAddress)
+	c := client.New(con)
 	log.Printf("Attempting to connect to master at %s\n", masterAddress)
 	if err != nil {
 		log.Fatal("failed to connect" + err.Error())
@@ -45,25 +46,27 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 	}
 
 	buffer := make([]byte, 1024)
-	reader := bufio.NewReader(con)
 	for _, cmd := range commands {
-		resp.ReplyArrayBulk(con, cmd...)
-		_, err = reader.Read(buffer)
+		resp.ReplyArrayBulk(c, cmd...)
+		// We want to know master's response immediately instead of buffering it
+		c.Flush()
+		_, err = c.Read(buffer)
 		if err != nil {
 			log.Panic("handshake failed, did not get a response from master")
 		}
 	}
 	log.Println("Handshake successful. Waiting for full resync...")
-	resp.ReplyArrayBulk(con, "psync", "?", "-1")
+	resp.ReplyArrayBulk(c, "psync", "?", "-1")
+	c.Flush()
 
-	_, err = handleFullResyncResponse(reader)
+	_, err = handleFullResyncResponse(c.Reader)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	// After replying with a fullresync the master should be sending
 	// an RDB file with the full database contents
-	_, err = parseRDBFile(reader)
+	_, err = parseRDBFile(c.Reader)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -1,17 +1,17 @@
 package command
 
 import (
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type SetCommand Command
 
-func (cmd *SetCommand) Execute(con net.Conn) {
+func (cmd *SetCommand) Execute(con client.Client) {
 	numArgs := len(cmd.args)
 	// TODO write a proper flag parser
 	if numArgs != 2 && numArgs != 4 {

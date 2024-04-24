@@ -1,14 +1,13 @@
 package command
 
 import (
-	"net"
-
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
 type ReplConfCommand Command
 
-func (cmd *ReplConfCommand) Execute(con net.Conn) {
+func (cmd *ReplConfCommand) Execute(con client.Client) {
 	if len(cmd.args) < 2 {
 		resp.ReplySimpleError(con, errWrongNumberOfArgs)
 		return

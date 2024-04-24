@@ -1,9 +1,8 @@
 package command
 
 import (
-	"net"
-
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
 const (
@@ -12,7 +11,7 @@ const (
 )
 
 type Executor interface {
-	Execute(conn net.Conn)
+	Execute(client client.Client)
 }
 
 type Command struct {
@@ -43,6 +42,6 @@ func New(label string, params []string) Executor {
 	return &NotImplementedCommand{}
 }
 
-func (cmd *NotImplementedCommand) Execute(con net.Conn) {
+func (cmd *NotImplementedCommand) Execute(con client.Client) {
 	resp.ReplySimpleError(con, "unknown command, may not be implemented yet")
 }
