@@ -124,10 +124,10 @@ func TestParseSimpleString(t *testing.T) {
 			value, err := parser.ParseSimpleString()
 			if test.shouldError {
 				if err == nil {
-					t.Fatalf("parsing simple string with input '%s', expected error, got %s", test.input, value)
+					t.Fatalf("%s: '%s', expected error, got %s", name, test.input, value)
 				}
 			} else if value != test.expected {
-				t.Fatalf("parsing bulk string with input '%s', expected %s, got %s", test.input, test.expected, value)
+				t.Fatalf("%s: '%s', expected %s, got %s", name, test.input, test.expected, value)
 			}
 		})
 	}

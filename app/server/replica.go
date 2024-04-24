@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
@@ -42,12 +43,12 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 		{"psync", "?", "-1"},
 	}
 
-	log.Println("Initiating handshake")
 	buffer := make([]byte, 1024)
+	reader := bufio.NewReader(con)
 	var n int
 	for _, cmd := range commands {
 		resp.ReplyArrayBulk(con, cmd)
-		n, err = con.Read(buffer)
+		n, err = reader.Read(buffer)
 		if err != nil {
 			log.Fatal(errHandshakeFail)
 		}
@@ -57,7 +58,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 	assertFullResyncReceived(buffer[:n])
 	// After replying with a fullresync the master should be sending
 	// an RDB file with the full database contents
-	resyncWithMaster(con, buffer)
+	resyncWithMaster(con)
 	log.Println("Full resync done")
 
 	return con
@@ -95,15 +96,16 @@ func assertFullResyncReceived(buffer []byte) string {
 	return message[1]
 }
 
-func resyncWithMaster(con net.Conn, buffer []byte) {
+func resyncWithMaster(con net.Conn) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
+	buffer := make([]byte, 1024)
 	n, err := con.Read(buffer)
 	if err != nil {
-		log.Fatal("Failed to get a response from master: ", err)
+		log.Fatal("Failed to get a response from master: ", err, string(buffer))
 	}
 
 	p := parser.NewCommandParser(buffer[:n])
-	token, err := p.Next()
+	token, err := p.Reader.ReadByte()
 	if err != nil || token != parser.BULK_STRING_TYPE {
 		log.Fatal(errUnexpected)
 	}

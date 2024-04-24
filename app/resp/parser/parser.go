@@ -1,13 +1,16 @@
 package parser
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io"
+	"strconv"
 	"strings"
 )
 
 type CommandParser struct {
-	buffer []byte
-	pos    int
+	Reader *bytes.Reader
 }
 
 type Command struct {
@@ -15,7 +18,6 @@ type Command struct {
 	Args  []string
 }
 
-var EOF error = errors.New("reached end of file")
 var errSyntax error = errors.New("syntax error")
 
 const (
@@ -27,32 +29,13 @@ const (
 )
 
 func NewCommandParser(buffer []byte) CommandParser {
-	parser := CommandParser{
-		buffer: buffer,
-		pos:    0,
+	return CommandParser{
+		Reader: bytes.NewReader(buffer),
 	}
-	return parser
-}
-
-func (p *CommandParser) Peek() byte {
-	return p.buffer[p.pos]
-}
-
-func (p *CommandParser) Next() (byte, error) {
-	if p.pos < len(p.buffer) {
-		val := p.buffer[p.pos]
-		p.pos++
-		return val, nil
-	}
-	return 0, EOF
-}
-
-func (p *CommandParser) Position() int {
-	return p.pos
 }
 
 func (p *CommandParser) Parse() (*Command, error) {
-	token, _ := p.Next()
+	token, _ := p.Reader.ReadByte()
 	if token != ARRAY_TYPE {
 		return nil, errSyntax
 	}
@@ -76,28 +59,27 @@ func (p *CommandParser) Parse() (*Command, error) {
 }
 
 func (p *CommandParser) ParseSimpleString() (string, error) {
-	token, _ := p.Next()
+	token, err := p.Reader.ReadByte()
+	if err != nil {
+		return "", err
+	}
 	if token != SIMPLE_STRING_TYPE {
-		return "", errSyntax
+		return "", syntaxError(SIMPLE_STRING_TYPE, rune(token))
 	}
+	s, err := p.readUntilCRLF()
 
-	var sb strings.Builder
-	for p.Peek() != CR {
-		token, err := p.Next()
-		if err != nil {
-			return "", err
-		}
-		sb.WriteByte(token)
-	}
-	err := p.parseCRLF()
-	return sb.String(), err
+	return string(s), err
+
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
-	if rune(p.Peek()) != BULK_STRING_TYPE {
-		return "", errors.New("a bulk string must start with $")
+	token, err := p.Reader.ReadByte()
+	if err != nil {
+		return "", err
 	}
-	p.Next()
+	if token != BULK_STRING_TYPE {
+		return "", syntaxError(BULK_STRING_TYPE, rune(token))
+	}
 	length, err := p.ParseNumber()
 	if err != nil {
 		return "", err
@@ -105,45 +87,51 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 
 	var sb strings.Builder
 	for i := 0; i < length; i++ {
-		token, err := p.Next()
+		token, err := p.Reader.ReadByte()
 		if err != nil {
-			return "", errSyntax
+			return sb.String(), fmt.Errorf("expected to read %d bytes, only got %d", length, i)
 		}
 		sb.WriteByte(token)
 	}
-	err = p.parseCRLF()
-	return sb.String(), err
+	return sb.String(), p.readCRLF()
 }
 
-func (p *CommandParser) parseCRLF() error {
-	token, _ := p.Next()
-	if rune(token) != CR {
-		return errSyntax
+func (p *CommandParser) ParseNumber() (int, error) {
+	rawNumber, err := p.readUntilCRLF()
+	if err != nil {
+		return -1, err
 	}
-	token, _ = p.Next()
-	if token != LF {
-		return errSyntax
+	return strconv.Atoi(string(rawNumber))
+}
+
+func (p *CommandParser) readUntilCRLF() ([]byte, error) {
+	var result []byte
+	for {
+		b, err := p.Reader.ReadByte()
+		if err == io.EOF {
+			return result, err
+		}
+		result = append(result, b)
+
+		last := len(result) - 2
+		if last >= 0 && result[last] == CR && b == LF {
+			return result[:last], nil
+		}
+	}
+}
+
+func (p *CommandParser) readCRLF() error {
+	token, err := p.Reader.ReadByte()
+	if err != nil || token != CR {
+		return syntaxError('\r', rune(token))
+	}
+	token, err = p.Reader.ReadByte()
+	if err != nil || token != LF {
+		return syntaxError('\n', rune(token))
 	}
 	return nil
 }
 
-func (p *CommandParser) ParseNumber() (int, error) {
-	arrLength := 0
-	var token byte
-	var err error
-	for token, err = p.Next(); isDigit(token); token, err = p.Next() {
-		if err != nil {
-			return 0, errSyntax
-		}
-		arrLength = arrLength*10 + int(token) - '0'
-	}
-
-	if next, _ := p.Next(); token != CR || next != LF {
-		return 0, errSyntax
-	}
-	return arrLength, nil
-}
-
-func isDigit(b byte) bool {
-	return b >= '0' && b <= '9'
+func syntaxError(expected rune, got rune) error {
+	return fmt.Errorf("syntax error: expected '%c', got '%c ", expected, got)
 }
