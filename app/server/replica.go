@@ -2,7 +2,10 @@ package server
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
@@ -13,10 +16,9 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-const (
-	errInvalidAck    = "Invalid acknowledgement, expected FULLRESYNC"
-	errUnexpected    = "Received unexpected response from master"
-	errHandshakeFail = "Failed to establish handshake with master"
+var (
+	errInvalidAck = errors.New("invalid acknowledgement, expected FULLRESYNC")
+	errUnexpected = errors.New("received unexpected response from master")
 )
 
 func configureReplica(listeningPort int, masterAddress string) {
@@ -40,25 +42,31 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 		{"ping"},
 		{"replconf", "listening-port", fmt.Sprint(listeningPort)},
 		{"replconf", "capa", "psync2"},
-		{"psync", "?", "-1"},
 	}
 
 	buffer := make([]byte, 1024)
 	reader := bufio.NewReader(con)
-	var n int
 	for _, cmd := range commands {
-		resp.ReplyArrayBulk(con, cmd)
-		n, err = reader.Read(buffer)
+		resp.ReplyArrayBulk(con, cmd...)
+		_, err = reader.Read(buffer)
 		if err != nil {
-			log.Fatal(errHandshakeFail)
+			log.Panic("handshake failed, did not get a response from master")
 		}
 	}
 	log.Println("Handshake successful. Waiting for full resync...")
+	resp.ReplyArrayBulk(con, "psync", "?", "-1")
 
-	assertFullResyncReceived(buffer[:n])
+	_, err = handleFullResyncResponse(reader)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	// After replying with a fullresync the master should be sending
 	// an RDB file with the full database contents
-	resyncWithMaster(con)
+	_, err = parseRDBFile(reader)
+	if err != nil {
+		log.Panic(err)
+	}
 	log.Println("Full resync done")
 
 	return con
@@ -69,17 +77,17 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 // expected format: +FULLRESYNC <master_replid> <offset>\r\n
 //
 // On success, returns the master's replication id
-func assertFullResyncReceived(buffer []byte) string {
-	p := parser.NewCommandParser(buffer)
+func handleFullResyncResponse(reader io.ByteReader) (string, error) {
+	p := parser.FromReader(reader)
 	s, err := p.ParseSimpleString()
 	if err != nil {
-		log.Fatal(errInvalidAck)
+		return "", errInvalidAck
 	}
 	log.Println("PSYNC replied with:", s)
 
 	message := strings.Split(s, " ")
 	if len(message) != 3 {
-		log.Fatal(errUnexpected)
+		return "", errUnexpected
 	}
 	label := message[0]
 	// masterIReplId := message[1]
@@ -90,32 +98,35 @@ func assertFullResyncReceived(buffer []byte) string {
 	_, err = strconv.Atoi(message[2]) // offset
 
 	if err != nil {
-		log.Fatalf("invalid offset")
+		return "", errors.New("offset must be a valid integer")
 	}
 
-	return message[1]
+	return message[1], nil
 }
 
-func resyncWithMaster(con net.Conn) {
+func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
-	buffer := make([]byte, 1024)
-	n, err := con.Read(buffer)
-	if err != nil {
-		log.Fatal("Failed to get a response from master: ", err, string(buffer))
-	}
-
-	p := parser.NewCommandParser(buffer[:n])
+	rdb := bytes.NewBuffer([]byte{})
+	p := parser.FromReader(reader)
 	token, err := p.Reader.ReadByte()
 	if err != nil || token != parser.BULK_STRING_TYPE {
-		log.Fatal(errUnexpected)
+		return nil, errUnexpected
 	}
 
-	_, err = p.ParseNumber()
+	fileSize, err := p.ParseNumber()
 	if err != nil {
-		log.Fatal(errUnexpected)
+		return nil, errUnexpected
 	}
 
-	//TODO do something with the file
+	for i := 0; i < fileSize; i++ {
+		b, err := reader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("expected a file with size %d bytes, got %d instead", fileSize, i)
+		}
+
+		rdb.WriteByte(b)
+	}
+	return rdb.Bytes(), nil
 }
 
 func listenMasterCommands(con net.Conn) {

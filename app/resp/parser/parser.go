@@ -10,7 +10,7 @@ import (
 )
 
 type CommandParser struct {
-	Reader *bytes.Reader
+	Reader io.ByteReader
 }
 
 type Command struct {
@@ -31,6 +31,12 @@ const (
 func NewCommandParser(buffer []byte) CommandParser {
 	return CommandParser{
 		Reader: bytes.NewReader(buffer),
+	}
+}
+
+func FromReader(r io.ByteReader) CommandParser {
+	return CommandParser{
+		Reader: r,
 	}
 }
 

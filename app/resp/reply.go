@@ -24,12 +24,12 @@ func ReplyNullBulkString(conn net.Conn) {
 	conn.Write([]byte("$-1\r\n"))
 }
 
-func ReplyArrayBulk(conn net.Conn, arr []string) {
-	respArray := fmt.Sprintf("*%d\r\n", len(arr))
+func ReplyArrayBulk(conn net.Conn, values ...string) {
+	respArray := fmt.Sprintf("*%d\r\n", len(values))
 	var sb strings.Builder
 
 	sb.WriteString(respArray)
-	for _, val := range arr {
+	for _, val := range values {
 		sb.WriteString(createBulkString(val))
 	}
 
