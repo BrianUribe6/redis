@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -15,7 +14,7 @@ func (cmd *SetCommand) Execute(con client.Client) {
 	numArgs := len(cmd.args)
 	// TODO write a proper flag parser
 	if numArgs != 2 && numArgs != 4 {
-		resp.ReplySimpleError(con, errWrongNumberOfArgs)
+		con.SendSimpleError(errWrongNumberOfArgs)
 		return
 	}
 	key := cmd.args[0]
@@ -25,18 +24,18 @@ func (cmd *SetCommand) Execute(con client.Client) {
 	if numArgs == 4 {
 		pxFlag := strings.ToLower(cmd.args[2])
 		if pxFlag != "px" {
-			resp.ReplySimpleError(con, errSyntax)
+			con.SendSimpleError(errSyntax)
 			return
 		}
 
 		exp, err := strconv.ParseInt(cmd.args[3], 10, 64)
 		if err != nil || exp < 0 {
-			resp.ReplySimpleError(con, "invalid expiry time")
+			con.SendSimpleError("invalid expiry time")
 			return
 		}
 		expiry = exp
 	}
 
 	store.Set(key, value, expiry)
-	resp.ReplySuccess(con)
+	con.SendSuccess()
 }

@@ -1,7 +1,6 @@
 package command
 
 import (
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -10,13 +9,13 @@ type GetCommand Command
 
 func (cmd *GetCommand) Execute(con client.Client) {
 	if len(cmd.args) != 1 {
-		resp.ReplySimpleError(con, errWrongNumberOfArgs)
+		con.SendSimpleError(errWrongNumberOfArgs)
 		return
 	}
 	value, exist := store.Get(cmd.args[0])
 	if !exist {
-		resp.ReplyNullBulkString(con)
+		con.SendNullBulkString()
 	} else {
-		resp.ReplyBulkString(con, value)
+		con.SendBulkString(value)
 	}
 }

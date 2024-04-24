@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -47,7 +46,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 
 	buffer := make([]byte, 1024)
 	for _, cmd := range commands {
-		resp.ReplyArrayBulk(c, cmd...)
+		c.SendArrayBulk(cmd...)
 		// We want to know master's response immediately instead of buffering it
 		c.Flush()
 		_, err = c.Read(buffer)
@@ -56,7 +55,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 		}
 	}
 	log.Println("Handshake successful. Waiting for full resync...")
-	resp.ReplyArrayBulk(c, "psync", "?", "-1")
+	c.SendArrayBulk("psync", "?", "-1")
 	c.Flush()
 
 	_, err = handleFullResyncResponse(c.Reader)
@@ -109,7 +108,7 @@ func handleFullResyncResponse(reader io.ByteReader) (string, error) {
 
 func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
-	rdb := bytes.NewBuffer([]byte{})
+	content := bytes.NewBuffer([]byte{})
 	p := parser.FromReader(reader)
 	token, err := p.Reader.ReadByte()
 	if err != nil || token != parser.BULK_STRING_TYPE {
@@ -127,9 +126,9 @@ func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 			return nil, fmt.Errorf("expected a file with size %d bytes, got %d instead", fileSize, i)
 		}
 
-		rdb.WriteByte(b)
+		content.WriteByte(b)
 	}
-	return rdb.Bytes(), nil
+	return content.Bytes(), nil
 }
 
 func listenMasterCommands(con net.Conn) {

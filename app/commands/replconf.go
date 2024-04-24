@@ -1,7 +1,6 @@
 package command
 
 import (
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
@@ -9,7 +8,7 @@ type ReplConfCommand Command
 
 func (cmd *ReplConfCommand) Execute(con client.Client) {
 	if len(cmd.args) < 2 {
-		resp.ReplySimpleError(con, errWrongNumberOfArgs)
+		con.SendSimpleError(errWrongNumberOfArgs)
 		return
 	}
 	// TODO
@@ -19,9 +18,9 @@ func (cmd *ReplConfCommand) Execute(con client.Client) {
 	case "capa":
 		break
 	default:
-		resp.ReplySimpleError(con, errSyntax)
+		con.SendSimpleError(errSyntax)
 		return
 	}
 
-	resp.ReplySuccess(con)
+	con.SendSuccess()
 }

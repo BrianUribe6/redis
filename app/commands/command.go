@@ -1,7 +1,6 @@
 package command
 
 import (
-	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
@@ -43,5 +42,5 @@ func New(label string, params []string) Executor {
 }
 
 func (cmd *NotImplementedCommand) Execute(con client.Client) {
-	resp.ReplySimpleError(con, "unknown command, may not be implemented yet")
+	con.SendSimpleError("unknown command, may not be implemented yet")
 }
