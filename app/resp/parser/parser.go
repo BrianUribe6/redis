@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -10,7 +9,7 @@ import (
 )
 
 type CommandParser struct {
-	Reader io.ByteReader
+	io.ByteReader
 }
 
 type Command struct {
@@ -28,20 +27,15 @@ const (
 	LF                 = '\n'
 )
 
-func NewCommandParser(buffer []byte) CommandParser {
-	return CommandParser{
-		Reader: bytes.NewReader(buffer),
-	}
-}
-
-func FromReader(r io.ByteReader) CommandParser {
-	return CommandParser{
-		Reader: r,
-	}
+func New(r io.ByteReader) CommandParser {
+	return CommandParser{r}
 }
 
 func (p *CommandParser) Parse() (*Command, error) {
-	token, _ := p.Reader.ReadByte()
+	token, err := p.ReadByte()
+	if err != nil {
+		return nil, err
+	}
 	if token != ARRAY_TYPE {
 		return nil, errSyntax
 	}
@@ -65,7 +59,7 @@ func (p *CommandParser) Parse() (*Command, error) {
 }
 
 func (p *CommandParser) ParseSimpleString() (string, error) {
-	token, err := p.Reader.ReadByte()
+	token, err := p.ReadByte()
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +73,7 @@ func (p *CommandParser) ParseSimpleString() (string, error) {
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
-	token, err := p.Reader.ReadByte()
+	token, err := p.ReadByte()
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +87,7 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 
 	var sb strings.Builder
 	for i := 0; i < length; i++ {
-		token, err := p.Reader.ReadByte()
+		token, err := p.ReadByte()
 		if err != nil {
 			return sb.String(), fmt.Errorf("expected to read %d bytes, only got %d", length, i)
 		}
@@ -113,7 +107,7 @@ func (p *CommandParser) ParseNumber() (int, error) {
 func (p *CommandParser) readUntilCRLF() ([]byte, error) {
 	var result []byte
 	for {
-		b, err := p.Reader.ReadByte()
+		b, err := p.ReadByte()
 		if err == io.EOF {
 			return result, err
 		}
@@ -127,11 +121,11 @@ func (p *CommandParser) readUntilCRLF() ([]byte, error) {
 }
 
 func (p *CommandParser) readCRLF() error {
-	token, err := p.Reader.ReadByte()
+	token, err := p.ReadByte()
 	if err != nil || token != CR {
 		return syntaxError('\r', rune(token))
 	}
-	token, err = p.Reader.ReadByte()
+	token, err = p.ReadByte()
 	if err != nil || token != LF {
 		return syntaxError('\n', rune(token))
 	}

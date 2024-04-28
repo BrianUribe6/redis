@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"bytes"
 	"testing"
 
 	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
@@ -47,7 +48,8 @@ func TestParseNumber(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			parser := parser.NewCommandParser([]byte(test.input))
+			reader := bytes.NewReader([]byte(test.input))
+			parser := parser.New(reader)
 			value, err := parser.ParseNumber()
 			if test.shouldError {
 				if err == nil {
@@ -81,7 +83,8 @@ func TestParseBulkString(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			parser := parser.NewCommandParser([]byte(test.input))
+			reader := bytes.NewReader([]byte(test.input))
+			parser := parser.New(reader)
 			value, err := parser.ParseBulkString()
 			if test.shouldError {
 				if err == nil {
@@ -120,7 +123,8 @@ func TestParseSimpleString(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			parser := parser.NewCommandParser([]byte(test.input))
+			reader := bytes.NewReader([]byte(test.input))
+			parser := parser.New(reader)
 			value, err := parser.ParseSimpleString()
 			if test.shouldError {
 				if err == nil {

@@ -20,17 +20,18 @@ var (
 	errUnexpected = errors.New("received unexpected response from master")
 )
 
-func configureReplica(listeningPort int, masterAddress string) {
+func (s *Server) ListenAsReplica(masterHostname string, masterPort string) {
+	masterAddr := net.JoinHostPort(masterHostname, masterPort)
+
 	log.Println("Initiating server in replica mode")
 	store.Info.SetRole(store.SLAVE_ROLE)
 
-	client := handshake(listeningPort, masterAddress)
+	master := handshake(s.port, masterAddr)
 
-	log.Println("Logging commands from master.")
-	listenMasterCommands(client)
+	go s.handleClient(master)
 }
 
-func handshake(listeningPort int, masterAddress string) net.Conn {
+func handshake(listeningPort int, masterAddress string) client.Client {
 	con, err := net.Dial("tcp", masterAddress)
 	c := client.New(con)
 	log.Printf("Attempting to connect to master at %s\n", masterAddress)
@@ -71,7 +72,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 	}
 	log.Println("Full resync done")
 
-	return con
+	return c
 }
 
 // Asserts buffer contents are formatted as a valid FULLRESYNC command.
@@ -80,7 +81,7 @@ func handshake(listeningPort int, masterAddress string) net.Conn {
 //
 // On success, returns the master's replication id
 func handleFullResyncResponse(reader io.ByteReader) (string, error) {
-	p := parser.FromReader(reader)
+	p := parser.New(reader)
 	s, err := p.ParseSimpleString()
 	if err != nil {
 		return "", errInvalidAck
@@ -94,7 +95,7 @@ func handleFullResyncResponse(reader io.ByteReader) (string, error) {
 	label := message[0]
 	// masterIReplId := message[1]
 	if label != "FULLRESYNC" {
-		log.Fatal("invalid command")
+		log.Fatal("expected to receive FULLRESYNC got: " + label)
 	}
 
 	_, err = strconv.Atoi(message[2]) // offset
@@ -109,8 +110,8 @@ func handleFullResyncResponse(reader io.ByteReader) (string, error) {
 func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
 	content := bytes.NewBuffer([]byte{})
-	p := parser.FromReader(reader)
-	token, err := p.Reader.ReadByte()
+	p := parser.New(reader)
+	token, err := p.ReadByte()
 	if err != nil || token != parser.BULK_STRING_TYPE {
 		return nil, errUnexpected
 	}
@@ -129,23 +130,4 @@ func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 		content.WriteByte(b)
 	}
 	return content.Bytes(), nil
-}
-
-func listenMasterCommands(con net.Conn) {
-	defer con.Close()
-	buffer := make([]byte, 1024)
-	for {
-		n, err := con.Read(buffer)
-		if err != nil {
-			break
-		}
-
-		commandParser := parser.NewCommandParser(buffer[:n])
-		c, err := commandParser.Parse()
-		if err != nil {
-			log.Println("Could not parse command", string(buffer))
-			continue
-		}
-		log.Println(c.Label, strings.Join(c.Args, " "))
-	}
 }

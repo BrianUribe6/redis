@@ -2,12 +2,13 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 
 	command "github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
-	parser "github.com/codecrafters-io/redis-starter-go/app/resp/parser"
+	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 )
 
 type Server struct {
@@ -25,7 +26,7 @@ func New(hostname string, port int) *Server {
 }
 
 func (s *Server) Listen() {
-	address := fmt.Sprintf("%s:%d", s.hostname, s.port)
+	address := net.JoinHostPort(s.hostname, fmt.Sprint(s.port))
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatal("ERROR: ", err)
@@ -35,45 +36,38 @@ func (s *Server) Listen() {
 	log.Printf("Server running at %s\n", address)
 	for {
 		conn, err := listener.Accept()
-		c := client.New(conn)
 		if err != nil {
-			log.Println("Error accepting connection: ", err)
+			log.Println("Error accepting connection:", err)
 			continue
 		}
-		go s.handleClient(c)
+		go s.handleClient(client.New(conn))
 	}
 }
 
 func (s *Server) handleClient(cli client.Client) {
-	buff := make([]byte, 1024)
-	isReplica := false
+	defer cli.Close()
 	for {
-		n, err := cli.Read(buff)
+		p := parser.New(cli)
+		decoded, err := p.Parse()
 		if err != nil {
-			break
+			if err == io.EOF {
+				log.Printf("lost connection with client %s", cli.Connection().RemoteAddr())
+				break
+			}
+			log.Println("Unrecognized command", err)
+			continue
 		}
-		commandParser := parser.NewCommandParser(buff[:n])
-		parsedCmd, err := commandParser.Parse()
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		if parsedCmd.Label == "psync" {
-			isReplica = true
+		cmd := command.New(decoded.Label, decoded.Args)
+		cmd.Execute(cli)
+		cli.Flush()
+
+		if decoded.Label == "psync" {
 			s.subscribe(cli)
 		}
-		cmd := command.New(parsedCmd.Label, parsedCmd.Args)
-
 		//TODO check if the command is mutable only "set" for now...
-		if parsedCmd.Label == "set" {
-			s.notify(buff[:n])
+		if decoded.Label == "set" {
+			s.propagate(decoded)
 		}
-		cmd.Execute(cli)
-
-		cli.Flush()
-	}
-	if !isReplica {
-		cli.Close()
 	}
 }
 
@@ -83,14 +77,10 @@ func (s *Server) subscribe(c client.Client) {
 }
 
 // Send cmd to all connected replicas
-func (s *Server) notify(cmd []byte) {
+func (s *Server) propagate(cmd *parser.Command) {
 	for _, replica := range s.replicas {
-		replica.Write(cmd)
+		c := append([]string{cmd.Label}, cmd.Args...)
+		replica.SendArrayBulk(c...)
 		replica.Flush()
 	}
-}
-
-func (s *Server) AsReplica(masterHostname string, masterPort int) {
-	masterAddr := fmt.Sprintf("%s:%d", masterHostname, masterPort)
-	configureReplica(s.port, masterAddr)
 }

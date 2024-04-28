@@ -17,19 +17,14 @@ func main() {
 
 	if isReplica() {
 		masterPort := flag.Arg(0)
-
-		if len(masterPort) == 0 {
-			log.Fatal("You must provide the master's port number")
-		}
-		port, err := strconv.Atoi(masterPort)
+		_, err := strconv.Atoi(masterPort)
 		if err != nil {
 			log.Fatal("Invalid port number")
 		}
-
-		s.AsReplica(*masterHostname, port)
+		s.ListenAsReplica(*masterHostname, masterPort)
 	}
-
 	s.Listen()
+
 }
 
 func isReplica() bool {
