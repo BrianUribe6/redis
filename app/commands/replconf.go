@@ -17,6 +17,9 @@ func (cmd *ReplConfCommand) Execute(con client.Client) {
 		break
 	case "capa":
 		break
+	case "getack":
+		con.SendArrayBulk("replconf", "ACK", "0")
+		return
 	default:
 		con.SendSimpleError(errSyntax)
 		return
