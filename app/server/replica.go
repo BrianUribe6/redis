@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
 
+	command "github.com/codecrafters-io/redis-starter-go/app/commands"
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
@@ -28,7 +30,7 @@ func (s *Server) ListenAsReplica(masterHostname string, masterPort string) {
 
 	master := handshake(s.port, masterAddr)
 
-	go s.handleClient(master)
+	go handleMaster(master)
 }
 
 func handshake(listeningPort int, masterAddress string) client.Client {
@@ -132,4 +134,28 @@ func parseRDBFile(c client.Client) ([]byte, error) {
 
 	c.BytesRead += p.BytesRead() + fileSize
 	return content.Bytes(), nil
+}
+
+func handleMaster(c client.Client) {
+	defer c.Close()
+	for {
+		p := parser.New(c)
+		decoded, err := p.Parse()
+		if err != nil {
+			if err == io.EOF {
+				log.Printf("lost connection with client %s", c.Connection().RemoteAddr())
+				break
+			}
+			log.Println("Unrecognized command", err)
+			continue
+		}
+		cmd := command.New(decoded.Label, decoded.Args)
+		response := cmd.Execute(c)
+		if decoded.Label == "replconf" {
+			c.Write(response)
+			c.Flush()
+
+		}
+		c.BytesRead += p.BytesRead()
+	}
 }

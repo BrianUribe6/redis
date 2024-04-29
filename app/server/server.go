@@ -10,7 +10,6 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type Server struct {
@@ -51,6 +50,7 @@ func (s *Server) handleClient(cli client.Client) {
 	for {
 		p := parser.New(cli)
 		decoded, err := p.Parse()
+
 		if err != nil {
 			if err == io.EOF {
 				log.Printf("lost connection with client %s", cli.Connection().RemoteAddr())
@@ -60,11 +60,12 @@ func (s *Server) handleClient(cli client.Client) {
 			continue
 		}
 		cmd := command.New(decoded.Label, decoded.Args)
-		result := cmd.Execute(cli)
+		response := cmd.Execute(cli)
 
-		if result != nil && store.Info.Role() == store.MASTER_ROLE {
-			cli.Write(result)
+		if response != nil {
+			cli.Write(response)
 			cli.Flush()
+
 		}
 
 		cli.BytesRead += p.BytesRead()
