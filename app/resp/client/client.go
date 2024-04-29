@@ -9,6 +9,7 @@ type Client struct {
 	conn net.Conn
 	*bufio.Reader
 	*bufio.Writer
+	BytesRead int
 }
 
 func New(conn net.Conn) Client {
@@ -16,6 +17,7 @@ func New(conn net.Conn) Client {
 		conn,
 		bufio.NewReader(conn),
 		bufio.NewWriter(conn),
+		0,
 	}
 }
 

@@ -7,8 +7,10 @@ import (
 	"net"
 
 	command "github.com/codecrafters-io/redis-starter-go/app/commands"
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type Server struct {
@@ -58,8 +60,14 @@ func (s *Server) handleClient(cli client.Client) {
 			continue
 		}
 		cmd := command.New(decoded.Label, decoded.Args)
-		cmd.Execute(cli)
-		cli.Flush()
+		result := cmd.Execute(cli)
+
+		if result != nil && store.Info.Role() == store.MASTER_ROLE {
+			cli.Write(result)
+			cli.Flush()
+		}
+
+		cli.BytesRead += p.BytesRead()
 
 		if decoded.Label == "psync" {
 			s.subscribe(cli)
@@ -80,7 +88,7 @@ func (s *Server) subscribe(c client.Client) {
 func (s *Server) propagate(cmd *parser.Command) {
 	for _, replica := range s.replicas {
 		c := append([]string{cmd.Label}, cmd.Args...)
-		replica.SendArrayBulk(c...)
+		replica.Write(resp.EncodeArrayBulk(c...))
 		replica.Flush()
 	}
 }

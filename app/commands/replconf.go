@@ -1,15 +1,17 @@
 package command
 
 import (
+	"fmt"
+
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
 type ReplConfCommand Command
 
-func (cmd *ReplConfCommand) Execute(con client.Client) {
+func (cmd *ReplConfCommand) Execute(con client.Client) RESPValue {
 	if len(cmd.args) < 2 {
-		con.SendSimpleError(errWrongNumberOfArgs)
-		return
+		return resp.EncodeSimpleError(errWrongNumberOfArgs)
 	}
 	// TODO
 	switch cmd.args[0] {
@@ -18,12 +20,11 @@ func (cmd *ReplConfCommand) Execute(con client.Client) {
 	case "capa":
 		break
 	case "getack":
-		con.SendArrayBulk("replconf", "ACK", "0")
-		return
+		totalBytes := fmt.Sprint(con.BytesRead)
+		return resp.EncodeArrayBulk("replconf", "ACK", totalBytes)
 	default:
-		con.SendSimpleError(errSyntax)
-		return
+		return resp.EncodeSimpleError(errSyntax)
 	}
 
-	con.SendSuccess()
+	return resp.Success()
 }

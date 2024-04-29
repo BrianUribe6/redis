@@ -38,6 +38,10 @@ func (r *ReplicationInfo) SetRole(role string) {
 	r.role = role
 }
 
+func (r *ReplicationInfo) Role() string {
+	return r.role
+}
+
 func (r *ReplicationInfo) String() string {
 	return fmt.Sprint(
 		"role:", r.role, "\n",

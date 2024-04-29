@@ -9,7 +9,8 @@ import (
 )
 
 type CommandParser struct {
-	io.ByteReader
+	reader    io.ByteReader
+	bytesRead int
 }
 
 type Command struct {
@@ -28,11 +29,16 @@ const (
 )
 
 func New(r io.ByteReader) CommandParser {
-	return CommandParser{r}
+	return CommandParser{reader: r}
+}
+
+func (p *CommandParser) Next() (byte, error) {
+	p.bytesRead++
+	return p.reader.ReadByte()
 }
 
 func (p *CommandParser) Parse() (*Command, error) {
-	token, err := p.ReadByte()
+	token, err := p.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +65,7 @@ func (p *CommandParser) Parse() (*Command, error) {
 }
 
 func (p *CommandParser) ParseSimpleString() (string, error) {
-	token, err := p.ReadByte()
+	token, err := p.Next()
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +79,7 @@ func (p *CommandParser) ParseSimpleString() (string, error) {
 }
 
 func (p *CommandParser) ParseBulkString() (string, error) {
-	token, err := p.ReadByte()
+	token, err := p.Next()
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +93,7 @@ func (p *CommandParser) ParseBulkString() (string, error) {
 
 	var sb strings.Builder
 	for i := 0; i < length; i++ {
-		token, err := p.ReadByte()
+		token, err := p.Next()
 		if err != nil {
 			return sb.String(), fmt.Errorf("expected to read %d bytes, only got %d", length, i)
 		}
@@ -107,7 +113,7 @@ func (p *CommandParser) ParseNumber() (int, error) {
 func (p *CommandParser) readUntilCRLF() ([]byte, error) {
 	var result []byte
 	for {
-		b, err := p.ReadByte()
+		b, err := p.Next()
 		if err == io.EOF {
 			return result, err
 		}
@@ -121,15 +127,19 @@ func (p *CommandParser) readUntilCRLF() ([]byte, error) {
 }
 
 func (p *CommandParser) readCRLF() error {
-	token, err := p.ReadByte()
+	token, err := p.Next()
 	if err != nil || token != CR {
 		return syntaxError('\r', rune(token))
 	}
-	token, err = p.ReadByte()
+	token, err = p.Next()
 	if err != nil || token != LF {
 		return syntaxError('\n', rune(token))
 	}
 	return nil
+}
+
+func (p *CommandParser) BytesRead() int {
+	return p.bytesRead
 }
 
 func syntaxError(expected rune, got rune) error {

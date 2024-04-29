@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/parser"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -47,7 +47,7 @@ func handshake(listeningPort int, masterAddress string) client.Client {
 
 	buffer := make([]byte, 1024)
 	for _, cmd := range commands {
-		c.SendArrayBulk(cmd...)
+		c.Write(resp.EncodeArrayBulk(cmd...))
 		// We want to know master's response immediately instead of buffering it
 		c.Flush()
 		_, err = c.Read(buffer)
@@ -56,17 +56,17 @@ func handshake(listeningPort int, masterAddress string) client.Client {
 		}
 	}
 	log.Println("Handshake successful. Waiting for full resync...")
-	c.SendArrayBulk("psync", "?", "-1")
+	c.Write(resp.EncodeArrayBulk("psync", "?", "-1"))
 	c.Flush()
 
-	_, err = handleFullResyncResponse(c.Reader)
+	_, err = handleFullResyncResponse(c)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	// After replying with a fullresync the master should be sending
 	// an RDB file with the full database contents
-	_, err = parseRDBFile(c.Reader)
+	_, err = parseRDBFile(c)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -80,8 +80,8 @@ func handshake(listeningPort int, masterAddress string) client.Client {
 // expected format: +FULLRESYNC <master_replid> <offset>\r\n
 //
 // On success, returns the master's replication id
-func handleFullResyncResponse(reader io.ByteReader) (string, error) {
-	p := parser.New(reader)
+func handleFullResyncResponse(c client.Client) (string, error) {
+	p := parser.New(c)
 	s, err := p.ParseSimpleString()
 	if err != nil {
 		return "", errInvalidAck
@@ -107,11 +107,11 @@ func handleFullResyncResponse(reader io.ByteReader) (string, error) {
 	return message[1], nil
 }
 
-func parseRDBFile(reader io.ByteReader) ([]byte, error) {
+func parseRDBFile(c client.Client) ([]byte, error) {
 	// Expect master to respond with $<file_size>\r\n<file_contents>
 	content := bytes.NewBuffer([]byte{})
-	p := parser.New(reader)
-	token, err := p.ReadByte()
+	p := parser.New(c)
+	token, err := p.Next()
 	if err != nil || token != parser.BULK_STRING_TYPE {
 		return nil, errUnexpected
 	}
@@ -122,12 +122,14 @@ func parseRDBFile(reader io.ByteReader) ([]byte, error) {
 	}
 
 	for i := 0; i < fileSize; i++ {
-		b, err := reader.ReadByte()
+		b, err := c.ReadByte()
 		if err != nil {
 			return nil, fmt.Errorf("expected a file with size %d bytes, got %d instead", fileSize, i)
 		}
 
 		content.WriteByte(b)
 	}
+
+	c.BytesRead += p.BytesRead() + fileSize
 	return content.Bytes(), nil
 }

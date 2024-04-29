@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type PSYNCCommand Command
 
-func (cmd *PSYNCCommand) Execute(c client.Client) {
+func (cmd *PSYNCCommand) Execute(c client.Client) RESPValue {
 	if len(cmd.args) != 2 {
-		c.SendSimpleError(errWrongNumberOfArgs)
-		return
+		return resp.EncodeSimpleError(errWrongNumberOfArgs)
 	}
 	conn := c.Connection()
 	log.Println("Received synchronization request from", conn.RemoteAddr().String())
+
 	// 1. Notify replica that it should expect a full copy of the database
-	c.SendSimpleString(fmt.Sprintf("FULLRESYNC %s 0", store.Info.MasterReplId))
+	c.Write(resp.EncodeSimpleString(fmt.Sprintf("FULLRESYNC %s 0", store.Info.MasterReplId)))
 
 	// 2. Read the file dump of the database
 	log.Println("Loading RDB...")
@@ -31,9 +32,9 @@ func (cmd *PSYNCCommand) Execute(c client.Client) {
 
 	file = append(file, data...)
 
-	c.Write(file)
-
 	log.Printf("Syncronization with replica %s succeeded", conn.RemoteAddr().String())
+
+	return file
 }
 
 func CreateEmptyRDB() []byte {

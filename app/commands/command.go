@@ -1,6 +1,7 @@
 package command
 
 import (
+	"github.com/codecrafters-io/redis-starter-go/app/resp"
 	"github.com/codecrafters-io/redis-starter-go/app/resp/client"
 )
 
@@ -9,8 +10,10 @@ const (
 	errSyntax            = "syntax error"
 )
 
+type RESPValue []byte
+
 type Executor interface {
-	Execute(client client.Client)
+	Execute(client client.Client) RESPValue
 }
 
 type Command struct {
@@ -41,6 +44,6 @@ func New(label string, params []string) Executor {
 	return &NotImplementedCommand{}
 }
 
-func (cmd *NotImplementedCommand) Execute(con client.Client) {
-	con.SendSimpleError("unknown command, may not be implemented yet")
+func (cmd *NotImplementedCommand) Execute(con client.Client) RESPValue {
+	return resp.EncodeSimpleError("unknown command, may not be implemented yet")
 }
